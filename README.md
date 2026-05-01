@@ -112,48 +112,6 @@ Frontend URL:
 http://localhost:5173
 ```
 
----
-
-# Postman Setup
-
-1. Open Postman
-2. Click **Import**
-3. Import `postman_collection.json`
-4. Run Register/Login request
-5. Token is automatically stored in collection variable after login
-6. Test protected task/admin routes
-
----
-
-# API Routes
-
-## Auth
-
-| Method | Endpoint | Access |
-|---|---|---|
-| POST | `/api/v1/auth/register` | Public |
-| POST | `/api/v1/auth/login` | Public |
-| GET | `/api/v1/auth/me` | Protected |
-
-## Tasks
-
-| Method | Endpoint | Access |
-|---|---|---|
-| POST | `/api/v1/tasks` | Protected |
-| GET | `/api/v1/tasks` | Protected |
-| GET | `/api/v1/tasks/:id` | Protected |
-| PUT | `/api/v1/tasks/:id` | Protected |
-| DELETE | `/api/v1/tasks/:id` | Protected |
-
-## Admin
-
-| Method | Endpoint | Access |
-|---|---|---|
-| GET | `/api/v1/admin/users` | Admin only |
-| GET | `/api/v1/admin/stats` | Admin only |
-
----
-
 # Dependencies
 
 ## Backend
