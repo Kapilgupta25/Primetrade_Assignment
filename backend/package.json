@@ -4,6 +4,9 @@
   "description": "Scalable REST API with JWT authentication, RBAC, and Task CRUD using Express + MongoDB.",
   "type": "module",
   "main": "server.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js"
