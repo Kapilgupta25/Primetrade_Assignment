@@ -6,10 +6,7 @@ Complete project using **React Vite, Tailwind CSS, Express.js, MongoDB, JWT Auth
 
 # Deployment Links
 
-Deployed on Render:
-
-```bash
-https://task-manger-frontend-ek4u.onrender.com
+Deployed on Render: https://task-manger-frontend-ek4u.onrender.com
 
 
 ## Project Structure
