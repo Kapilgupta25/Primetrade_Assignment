@@ -1,6 +1,16 @@
-# Primetrade Backend Intern Assignment
+# Task Manager
 
 Complete project using **React Vite, Tailwind CSS, Express.js, MongoDB, JWT Authentication, Role-Based Access Control, Task CRUD APIs, and Postman collection**.
+
+---
+
+# Deployment Links
+
+Deployed on Render:
+
+```bash
+https://task-manger-frontend-ek4u.onrender.com
+
 
 ## Project Structure
 
