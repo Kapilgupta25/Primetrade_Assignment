@@ -1,8 +1,32 @@
 import { useEffect, useState } from 'react';
-import Navbar from '../components/Navbar.jsx';
+import { CheckCircle2, ClipboardList, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react';
 import api from '../api/axios.js';
 
 const defaultForm = { title: '', description: '', status: 'pending', priority: 'medium' };
+
+const formatLabel = (value) => value.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(' ');
+
+const getStatusBadgeClass = (status) => {
+  switch (status) {
+    case 'completed':
+      return 'bg-emerald-50 text-emerald-700';
+    case 'in-progress':
+      return 'bg-amber-50 text-amber-700';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
+};
+
+const getPriorityBadgeClass = (priority) => {
+  switch (priority) {
+    case 'high':
+      return 'bg-rose-50 text-rose-700';
+    case 'medium':
+      return 'bg-blue-50 text-blue-700';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
+};
 
 const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
@@ -11,12 +35,18 @@ const Dashboard = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [query, setQuery] = useState('');
 
-  const fetchTasks = async () => {
+  const fetchTasks = async ({ showMessage = false } = {}) => {
     setLoading(true);
     try {
       const { data } = await api.get('/tasks');
       setTasks(data.tasks);
+      setError('');
+      if (showMessage) {
+        setMessage('Tasks refreshed');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Could not fetch tasks');
     } finally {
@@ -24,7 +54,9 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => { fetchTasks(); }, []);
+  useEffect(() => {
+    fetchTasks();
+  }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -32,6 +64,8 @@ const Dashboard = () => {
     e.preventDefault();
     setError('');
     setMessage('');
+    setSubmitting(true);
+
     try {
       if (editingId) {
         await api.put(`/tasks/${editingId}`, form);
@@ -40,86 +74,266 @@ const Dashboard = () => {
         await api.post('/tasks', form);
         setMessage('Task created successfully');
       }
+
       setForm(defaultForm);
       setEditingId(null);
-      fetchTasks();
+      await fetchTasks();
     } catch (err) {
       setError(err.response?.data?.message || 'Action failed');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleEdit = (task) => {
     setEditingId(task._id);
-    setForm({ title: task.title, description: task.description, status: task.status, priority: task.priority });
+    setForm({
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this task?')) return;
+    if (!window.confirm('Delete this task?')) return;
+
+    setError('');
     try {
       await api.delete(`/tasks/${id}`);
       setMessage('Task deleted successfully');
-      fetchTasks();
+      await fetchTasks();
     } catch (err) {
       setError(err.response?.data?.message || 'Delete failed');
     }
   };
 
-  return (
-    <>
-      <Navbar />
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 lg:grid-cols-[380px_1fr]">
-        <section className="card h-fit">
-          <h1 className="text-2xl font-bold">{editingId ? 'Update Task' : 'Create Task'}</h1>
-          {message && <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{message}</p>}
-          {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-            <input className="input" name="title" placeholder="Task title" value={form.title} onChange={handleChange} required />
-            <textarea className="input min-h-28" name="description" placeholder="Description" value={form.description} onChange={handleChange} required />
-            <select className="input" name="status" value={form.status} onChange={handleChange}>
-              <option value="pending">Pending</option>
-              <option value="in-progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </select>
-            <select className="input" name="priority" value={form.priority} onChange={handleChange}>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-            <button className="btn w-full">{editingId ? 'Update Task' : 'Add Task'}</button>
-            {editingId && <button type="button" className="w-full rounded-lg border px-4 py-2" onClick={() => { setEditingId(null); setForm(defaultForm); }}>Cancel Edit</button>}
-          </form>
-        </section>
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredTasks = tasks.filter((task) => (
+    !normalizedQuery
+    || task.title.toLowerCase().includes(normalizedQuery)
+    || task.description.toLowerCase().includes(normalizedQuery)
+  ));
 
-        <section className="card">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Tasks</h2>
-            <button className="rounded-lg border px-3 py-2 text-sm" onClick={fetchTasks}>Refresh</button>
+  const summaryCards = [
+    {
+      label: 'Total',
+      value: tasks.length,
+      icon: ClipboardList,
+      accent: 'bg-blue-50 text-blue-700'
+    },
+    {
+      label: 'Pending',
+      value: tasks.filter((task) => task.status === 'pending').length,
+      icon: RefreshCw,
+      accent: 'bg-amber-50 text-amber-700'
+    },
+    {
+      label: 'Done',
+      value: tasks.filter((task) => task.status === 'completed').length,
+      icon: CheckCircle2,
+      accent: 'bg-emerald-50 text-emerald-700'
+    }
+  ];
+
+  return (
+    <div className="space-y-6 pb-6">
+      <section className="app-section pb-0">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <p className="page-eyebrow">Dashboard</p>
+            <h1 className="section-title">My tasks</h1>
+            <p className="max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+              Add tasks, update them, and keep track of what is left to do.
+            </p>
           </div>
-          {loading ? <p className="mt-6 text-slate-600">Loading...</p> : null}
-          <div className="mt-6 grid gap-4">
-            {tasks.length === 0 && !loading ? <p className="text-slate-600">No tasks found.</p> : null}
-            {tasks.map((task) => (
-              <article key={task._id} className="rounded-xl border p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-bold">{task.title}</h3>
-                    <p className="mt-1 text-slate-600">{task.description}</p>
-                    <div className="mt-3 flex gap-2 text-xs">
-                      <span className="rounded-full bg-slate-100 px-3 py-1">{task.status}</span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1">{task.priority}</span>
+
+          <button className="btn-secondary self-start" onClick={() => fetchTasks({ showMessage: true })} type="button">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </section>
+
+      {message ? <p className="alert-success">{message}</p> : null}
+      {error ? <p className="alert-error">{error}</p> : null}
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        {summaryCards.map((card) => (
+          <article key={card.label} className="rounded-3xl border border-slate-200/80 bg-white/85 p-5 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.35)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-500">{card.label}</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-950">{card.value}</p>
+              </div>
+              <span className={`rounded-2xl p-3 ${card.accent}`}>
+                <card.icon className="h-5 w-5" />
+              </span>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
+        <aside className="panel-strong p-6">
+          <div className="space-y-2">
+            <p className="page-eyebrow">{editingId ? 'Edit task' : 'New task'}</p>
+            <h2 className="text-2xl font-semibold">{editingId ? 'Update task' : 'Create task'}</h2>
+            <p className="text-sm leading-6 text-slate-600">
+              Fill in the details below and save your task.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div>
+              <label className="label" htmlFor="task-title">Title</label>
+              <input
+                className="input"
+                id="task-title"
+                name="title"
+                onChange={handleChange}
+                placeholder="Example: Finish project report"
+                required
+                value={form.title}
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="task-description">Description</label>
+              <textarea
+                className="input min-h-28"
+                id="task-description"
+                name="description"
+                onChange={handleChange}
+                placeholder="Add a short note about this task"
+                required
+                value={form.description}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="task-status">Status</label>
+                <select className="input" id="task-status" name="status" onChange={handleChange} value={form.status}>
+                  <option value="pending">Pending</option>
+                  <option value="in-progress">In progress</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="task-priority">Priority</label>
+                <select className="input" id="task-priority" name="priority" onChange={handleChange} value={form.priority}>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button className="btn-primary w-full" disabled={submitting} type="submit">
+                {submitting ? 'Saving...' : editingId ? 'Update task' : 'Add task'}
+              </button>
+              {editingId ? (
+                <button
+                  className="btn-secondary w-full"
+                  onClick={() => {
+                    setEditingId(null);
+                    setForm(defaultForm);
+                  }}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </form>
+        </aside>
+
+        <section className="panel-strong p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-2">
+              <p className="page-eyebrow">Task list</p>
+              <h2 className="text-2xl font-semibold">All tasks</h2>
+              <p className="text-sm leading-6 text-slate-600">
+                Search by title or description to quickly find a task.
+              </p>
+            </div>
+
+            <div className="relative w-full max-w-sm">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                className="input pl-11"
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search tasks"
+                value={query}
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Showing <span className="font-semibold text-slate-900">{filteredTasks.length}</span> of{' '}
+            <span className="font-semibold text-slate-900">{tasks.length}</span> tasks
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {loading ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center text-slate-500">
+                Loading tasks...
+              </div>
+            ) : null}
+
+            {!loading && tasks.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
+                <p className="text-lg font-semibold text-slate-900">No tasks yet</p>
+                <p className="mt-2 text-sm text-slate-600">Create your first task to get started.</p>
+              </div>
+            ) : null}
+
+            {!loading && tasks.length > 0 && filteredTasks.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
+                <p className="text-lg font-semibold text-slate-900">No matching tasks</p>
+                <p className="mt-2 text-sm text-slate-600">Try a different search term.</p>
+              </div>
+            ) : null}
+
+            {!loading && filteredTasks.map((task) => (
+              <article key={task._id} className="rounded-3xl border border-slate-200/80 bg-white/85 p-5 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.35)]">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-xl font-semibold">{task.title}</h3>
+                      <p className="mt-2 text-sm leading-7 text-slate-600">{task.description}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`badge ${getStatusBadgeClass(task.status)}`}>{formatLabel(task.status)}</span>
+                      <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>{formatLabel(task.priority)} priority</span>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button className="rounded-lg border px-3 py-2 text-sm" onClick={() => handleEdit(task)}>Edit</button>
-                    <button className="rounded-lg bg-red-600 px-3 py-2 text-sm text-white" onClick={() => handleDelete(task._id)}>Delete</button>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button className="btn-secondary" onClick={() => handleEdit(task)} type="button">
+                      <Pencil className="h-4 w-4" />
+                      Edit
+                    </button>
+                    <button
+                      className="btn-secondary text-rose-700 hover:border-rose-200 hover:bg-rose-50"
+                      onClick={() => handleDelete(task._id)}
+                      type="button"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
                   </div>
                 </div>
               </article>
             ))}
           </div>
         </section>
-      </main>
-    </>
+      </section>
+    </div>
   );
 };
 
